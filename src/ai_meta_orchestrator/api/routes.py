@@ -45,7 +45,9 @@ from ai_meta_orchestrator.domain.workflows.workflow_models import (
     WorkflowStatus,
 )
 
-# Store for workflows (in-memory for now, would use database in production)
+# WARNING: In-memory storage for development/testing only.
+# Data will NOT persist across server restarts.
+# For production, implement proper persistence using a database.
 _workflows: dict[UUID, Workflow] = {}
 _workflow_results: dict[UUID, WorkflowResultResponse] = {}
 

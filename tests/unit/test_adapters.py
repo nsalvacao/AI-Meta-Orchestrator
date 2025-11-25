@@ -1,14 +1,19 @@
-"""Unit tests for placeholder adapters."""
+"""Unit tests for adapters."""
 
+import os
 import warnings
+from unittest.mock import patch
 
 from ai_meta_orchestrator.adapters.credentials.credential_adapter import (
     PlaceholderCredentialManager,
 )
 from ai_meta_orchestrator.adapters.external_cli.cli_adapters import (
+    BaseCLIAdapter,
+    CLIConfig,
     CodexCLIAdapter,
     CopilotCLIAdapter,
     GeminiCLIAdapter,
+    PlaceholderCLIAdapter,
     get_cli_adapter,
 )
 from ai_meta_orchestrator.adapters.git_cicd.git_cicd_adapter import (
@@ -23,30 +28,52 @@ from ai_meta_orchestrator.ports.external_ports.external_port import ExternalCLIT
 class TestCLIAdapters:
     """Tests for CLI adapters."""
 
-    def test_gemini_adapter_not_available(self) -> None:
-        """Test Gemini CLI adapter reports not available."""
+    def test_gemini_adapter_cli_type(self) -> None:
+        """Test Gemini CLI adapter has correct CLI type."""
         adapter = GeminiCLIAdapter()
-        assert adapter.is_available() is False
         assert adapter.cli_type == ExternalCLIType.GEMINI
 
-    def test_codex_adapter_not_available(self) -> None:
-        """Test Codex CLI adapter reports not available."""
+    def test_codex_adapter_cli_type(self) -> None:
+        """Test Codex CLI adapter has correct CLI type."""
         adapter = CodexCLIAdapter()
-        assert adapter.is_available() is False
         assert adapter.cli_type == ExternalCLIType.CODEX
 
-    def test_copilot_adapter_not_available(self) -> None:
-        """Test Copilot CLI adapter reports not available."""
+    def test_copilot_adapter_cli_type(self) -> None:
+        """Test Copilot CLI adapter has correct CLI type."""
         adapter = CopilotCLIAdapter()
-        assert adapter.is_available() is False
         assert adapter.cli_type == ExternalCLIType.COPILOT
 
-    def test_execute_returns_not_implemented(self) -> None:
-        """Test execute returns not implemented error."""
-        adapter = GeminiCLIAdapter()
-        result = adapter.execute("test command")
-        assert result.success is False
-        assert "not yet implemented" in result.error
+    def test_gemini_adapter_not_available_when_cli_not_found(self) -> None:
+        """Test Gemini CLI adapter reports not available when CLI not found."""
+        with patch("shutil.which", return_value=None):
+            adapter = GeminiCLIAdapter()
+            assert adapter.is_available() is False
+
+    def test_codex_adapter_available_when_cli_found(self) -> None:
+        """Test Codex CLI adapter reports available when CLI found."""
+        with patch("shutil.which", return_value="/usr/bin/openai"):
+            adapter = CodexCLIAdapter()
+            assert adapter.is_available() is True
+
+    def test_execute_returns_not_found_when_cli_missing(self) -> None:
+        """Test execute returns CLI not found error when executable missing."""
+        with patch("shutil.which", return_value=None):
+            adapter = GeminiCLIAdapter()
+            result = adapter.execute("test command")
+            assert result.success is False
+            assert "not found" in result.error.lower()
+            assert result.exit_code == 127
+
+    def test_execute_returns_auth_required_when_not_authenticated(self) -> None:
+        """Test execute returns auth required when API key missing."""
+        with (
+            patch("shutil.which", return_value="/usr/bin/gemini"),
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            adapter = GeminiCLIAdapter()
+            result = adapter.execute("test command")
+            assert result.success is False
+            assert "authentication required" in result.error.lower()
 
     def test_get_cli_adapter_factory(self) -> None:
         """Test CLI adapter factory function."""
@@ -55,6 +82,69 @@ class TestCLIAdapters:
 
         adapter = get_cli_adapter(ExternalCLIType.CODEX)
         assert isinstance(adapter, CodexCLIAdapter)
+
+        adapter = get_cli_adapter(ExternalCLIType.COPILOT)
+        assert isinstance(adapter, CopilotCLIAdapter)
+
+        adapter = get_cli_adapter(ExternalCLIType.CUSTOM)
+        assert isinstance(adapter, PlaceholderCLIAdapter)
+
+    def test_cli_config_defaults(self) -> None:
+        """Test CLIConfig dataclass defaults."""
+        config = CLIConfig(executable="test")
+        assert config.executable == "test"
+        assert config.api_key_env is None
+        assert config.timeout == 300
+        assert config.extra_args == []
+        assert config.working_dir is None
+
+    def test_base_cli_adapter_build_command(self) -> None:
+        """Test BaseCLIAdapter builds command correctly."""
+        config = CLIConfig(
+            executable="test-cli",
+            extra_args=["--verbose"],
+        )
+        adapter = BaseCLIAdapter(ExternalCLIType.CUSTOM, config)
+        adapter._executable_path = "/usr/bin/test-cli"
+
+        cmd = adapter._build_command("run --flag")
+        assert cmd == ["/usr/bin/test-cli", "--verbose", "run", "--flag"]
+
+    def test_base_cli_adapter_build_command_with_args(self) -> None:
+        """Test BaseCLIAdapter builds command with args safely."""
+        config = CLIConfig(
+            executable="test-cli",
+            extra_args=["--verbose"],
+        )
+        adapter = BaseCLIAdapter(ExternalCLIType.CUSTOM, config)
+        adapter._executable_path = "/usr/bin/test-cli"
+
+        # Args should be added as separate list items (safe from shell injection)
+        cmd = adapter._build_command("suggest", args=["user input with spaces"])
+        assert cmd == ["/usr/bin/test-cli", "--verbose", "suggest", "user input with spaces"]
+
+        # Even input with shell metacharacters is safe
+        cmd = adapter._build_command("explain", args=["rm -rf /; echo 'pwned'"])
+        assert cmd == ["/usr/bin/test-cli", "--verbose", "explain", "rm -rf /; echo 'pwned'"]
+
+    def test_gemini_adapter_api_key_envs(self) -> None:
+        """Test Gemini adapter checks multiple API key environment variables."""
+        adapter = GeminiCLIAdapter()
+
+        # No API key set
+        with patch.dict(os.environ, {}, clear=True):
+            assert adapter.is_authenticated() is False
+            assert adapter.get_api_key() is None
+
+        # GOOGLE_API_KEY set
+        with patch.dict(os.environ, {"GOOGLE_API_KEY": "test-key"}, clear=True):
+            assert adapter.is_authenticated() is True
+            assert adapter.get_api_key() == "test-key"
+
+        # GEMINI_API_KEY set
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key2"}, clear=True):
+            assert adapter.is_authenticated() is True
+            assert adapter.get_api_key() == "test-key2"
 
 
 class TestCredentialManager:

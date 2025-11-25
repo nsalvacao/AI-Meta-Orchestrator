@@ -115,21 +115,21 @@ with task breakdown and prioritization for implementation tracking.
 
 ---
 
-## Phase 3: Advanced Features 🔴
+## Phase 3: Advanced Features 🟡
 
-### 3.1 External CLI Integrations 🔴 ⭐
-- [ ] Gemini CLI integration
-  - [ ] Implement GeminiCLIAdapter
-  - [ ] Add authentication support
-  - [ ] Create agent wrapper
-- [ ] Codex CLI integration
-  - [ ] Implement CodexCLIAdapter
-  - [ ] Add authentication support
-  - [ ] Create agent wrapper
-- [ ] Copilot Agent CLI integration
-  - [ ] Implement CopilotCLIAdapter
-  - [ ] Add authentication support
-  - [ ] Create agent wrapper
+### 3.1 External CLI Integrations 🟢 ⭐
+- [x] Gemini CLI integration
+  - [x] Implement GeminiCLIAdapter
+  - [x] Add authentication support
+  - [x] Create agent wrapper
+- [x] Codex CLI integration
+  - [x] Implement CodexCLIAdapter
+  - [x] Add authentication support
+  - [x] Create agent wrapper
+- [x] Copilot Agent CLI integration
+  - [x] Implement CopilotCLIAdapter
+  - [x] Add authentication support
+  - [x] Create agent wrapper
 
 ### 3.2 Web Dashboard 🔴
 - [ ] Design dashboard architecture
@@ -230,22 +230,22 @@ with task breakdown and prioritization for implementation tracking.
 
 ## Version Milestones
 
-### v0.1.0 (Current - MVP) 🟢
+### v0.1.0 (MVP) 🟢
 - Core multi-agent orchestration
 - Basic task and workflow management
 - CLI interface
 - Placeholder adapters
 
-### v0.2.0 (Next) 🟡
+### v0.2.0 (Current) 🟢
 - Workflow templates system ✅
 - Plugin architecture ✅
 - REST API server ✅
 - Enhanced observability ✅
 - Improved credential management ✅
 - Git integration ✅
+- External CLI integrations ✅
 
-### v0.3.0 (Planned) 🔴
-- External CLI integrations
+### v0.3.0 (Next) 🟡
 - Web dashboard MVP
 - Database persistence
 - Advanced workflow features
@@ -272,7 +272,7 @@ with task breakdown and prioritization for implementation tracking.
 | Enhanced Observability | Done | High |
 | Credential Management | Done | High |
 | Git Integration | Done | High |
-| External CLI Integrations | Medium | High |
+| External CLI Integrations | Done | High |
 | Web Dashboard | Large | Medium |
 | Advanced Workflows | Medium | Medium |
 | Plugin Marketplace | Large | Low |

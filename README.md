@@ -38,7 +38,7 @@ src/ai_meta_orchestrator/
 │   └── external_ports/  # External system interfaces
 ├── adapters/            # Implementation of port interfaces
 │   ├── internal_agents/ # CrewAI agent implementations
-│   ├── external_cli/    # External CLI adapters
+│   ├── external_cli/    # External CLI adapters and agents
 │   ├── templates/       # Built-in workflow templates
 │   ├── credentials/     # Credential management
 │   ├── git_cicd/        # Git/CI-CD integration
@@ -269,6 +269,58 @@ registry = PluginRegistry()
 registry.register(MyLoggingPlugin())
 ```
 
+### Using External CLI Agents
+
+The orchestrator supports external AI CLI tools as agents:
+
+```python
+from ai_meta_orchestrator.adapters.external_cli import (
+    GeminiAgent,
+    CodexAgent,
+    CopilotAgent,
+    create_cli_agent,
+)
+from ai_meta_orchestrator.domain.agents.agent_models import AgentRole
+from ai_meta_orchestrator.domain.tasks.task_models import Task
+from ai_meta_orchestrator.ports.external_ports.external_port import ExternalCLIType
+
+# Create a Gemini-powered agent
+# Requires: GOOGLE_API_KEY or GEMINI_API_KEY environment variable
+gemini_agent = GeminiAgent(role=AgentRole.DEV)
+
+# Create a Codex/OpenAI-powered agent
+# Requires: OPENAI_API_KEY environment variable
+codex_agent = CodexAgent(role=AgentRole.DEV)
+
+# Create a GitHub Copilot CLI agent
+# Requires: gh CLI installed with copilot extension
+copilot_agent = CopilotAgent(role=AgentRole.DEV)
+
+# Use factory function
+agent = create_cli_agent(ExternalCLIType.GEMINI, role=AgentRole.QA)
+
+# Check availability
+if gemini_agent.is_available():
+    task = Task(
+        name="Generate Code",
+        description="Write a Python function to sort a list",
+        assigned_to=AgentRole.DEV,
+        expected_output="Python code",
+    )
+    result = gemini_agent.execute_task(task)
+    print(result.output)
+```
+
+**Prerequisites for External CLI Agents:**
+
+- **Gemini CLI**: Set `GOOGLE_API_KEY` or `GEMINI_API_KEY` environment variable
+- **Codex CLI**: Set `OPENAI_API_KEY` environment variable and install OpenAI CLI
+- **Copilot CLI**: Install GitHub CLI (`gh`) and the copilot extension:
+  ```bash
+  gh extension install github/gh-copilot
+  gh auth login
+  ```
+
 ## Development
 
 ### Running Tests
@@ -312,10 +364,10 @@ mypy src
 - [x] Enhanced observability (OpenTelemetry support)
 - [x] Secure credential management
 - [x] Git integration
+- [x] External CLI integrations (Gemini CLI, Codex CLI, Copilot Agent CLI)
 
 ### Planned (v0.3.0+)
 
-- [ ] External CLI integrations (Gemini CLI, Codex CLI, Copilot Agent CLI)
 - [ ] Web dashboard
 - [ ] Database persistence
 - [ ] Advanced workflow features (parallel, hierarchical)

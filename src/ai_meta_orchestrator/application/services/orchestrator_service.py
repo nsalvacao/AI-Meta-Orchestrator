@@ -23,6 +23,7 @@ from ai_meta_orchestrator.domain.workflows.workflow_models import (
     WorkflowConfig,
     WorkflowMode,
     WorkflowResult,
+    WorkflowStatus,
 )
 from ai_meta_orchestrator.ports.external_ports.external_port import ObservabilityPort
 
@@ -289,6 +290,14 @@ class OrchestratorService:
             if workflow.config.mode == WorkflowMode.SEQUENTIAL:
                 # Sequential execution
                 for task in workflow.tasks:
+                    # Check for pause
+                    if workflow.status == WorkflowStatus.PAUSED:
+                        self._observability.log_event(
+                            "workflow_paused",
+                            {"workflow_id": str(workflow.id)},
+                        )
+                        break
+
                     if workflow.config.enable_correction_loop:
                         result = self.execute_with_correction_loop(task)
                     else:
@@ -306,8 +315,15 @@ class OrchestratorService:
                             errors.append(f"Task {task.name}: {result.error}")
 
                     workflow.increment_iteration()
+
+            elif workflow.config.mode == WorkflowMode.PARALLEL:
+                # Parallel execution with dependency resolution
+                tasks_completed, tasks_failed, outputs, errors = (
+                    self._run_parallel_workflow(workflow)
+                )
+
             else:
-                # For PARALLEL and HIERARCHICAL modes, use CrewAI's Crew
+                # For HIERARCHICAL mode, use CrewAI's Crew
                 crew_agents = [
                     self._agents[role].crewai_agent
                     for role in required_roles
@@ -326,18 +342,12 @@ class OrchestratorService:
                     if task.assigned_to in self._agents
                 ]
 
-                process = (
-                    Process.hierarchical
-                    if workflow.config.mode == WorkflowMode.HIERARCHICAL
-                    else Process.sequential
-                )
-
                 # Note: CrewAI's Crew expects list[BaseAgent], but Agent inherits from
                 # BaseAgent. The type: ignore is needed due to list invariance in mypy.
                 crew = Crew(
                     agents=crew_agents,  # type: ignore[arg-type]
                     tasks=crew_tasks,
-                    process=process,
+                    process=Process.hierarchical,
                     verbose=workflow.config.verbose,
                     memory=workflow.config.memory,
                 )
@@ -351,33 +361,125 @@ class OrchestratorService:
                     errors.append(str(e))
 
             duration = time.time() - start_time
-            success = tasks_failed == 0
 
-            workflow_result = WorkflowResult(
-                success=success,
-                tasks_completed=tasks_completed,
-                tasks_failed=tasks_failed,
-                total_iterations=workflow.current_iteration,
-                outputs=outputs,
-                errors=errors,
-                duration_seconds=duration,
-            )
+            # Only complete if not paused
+            if workflow.status != WorkflowStatus.PAUSED:
+                success = tasks_failed == 0
 
-            workflow.complete(workflow_result)
-            self._observability.log_event(
-                "workflow_completed",
-                {
-                    "workflow_id": str(workflow.id),
-                    "success": success,
-                    "tasks_completed": tasks_completed,
-                    "tasks_failed": tasks_failed,
-                    "duration": duration,
-                },
-            )
+                workflow_result = WorkflowResult(
+                    success=success,
+                    tasks_completed=tasks_completed,
+                    tasks_failed=tasks_failed,
+                    total_iterations=workflow.current_iteration,
+                    outputs=outputs,
+                    errors=errors,
+                    duration_seconds=duration,
+                )
 
-            return workflow_result
+                workflow.complete(workflow_result)
+                self._observability.log_event(
+                    "workflow_completed",
+                    {
+                        "workflow_id": str(workflow.id),
+                        "success": success,
+                        "tasks_completed": tasks_completed,
+                        "tasks_failed": tasks_failed,
+                        "duration": duration,
+                    },
+                )
+
+                return workflow_result
+            else:
+                # Return partial result for paused workflows
+                return WorkflowResult(
+                    success=False,
+                    tasks_completed=tasks_completed,
+                    tasks_failed=tasks_failed,
+                    total_iterations=workflow.current_iteration,
+                    outputs=outputs,
+                    errors=["Workflow paused"],
+                    duration_seconds=duration,
+                )
         finally:
             self._observability.end_span(span_id)
+
+    def _run_parallel_workflow(
+        self,
+        workflow: Workflow,
+    ) -> tuple[int, int, dict[str, Any], list[str]]:
+        """Run workflow tasks in parallel where dependencies allow.
+
+        This method executes tasks that have no dependencies or whose
+        dependencies have been completed, allowing for parallel execution.
+
+        Args:
+            workflow: The workflow to run.
+
+        Returns:
+            Tuple of (tasks_completed, tasks_failed, outputs, errors).
+        """
+        import concurrent.futures
+        import threading
+
+        outputs: dict[str, Any] = {}
+        errors: list[str] = []
+        tasks_completed = 0
+        tasks_failed = 0
+        lock = threading.Lock()
+
+        def execute_single_task(task: Task) -> TaskResult:
+            """Execute a single task and return the result."""
+            if workflow.config.enable_correction_loop:
+                return self.execute_with_correction_loop(task)
+            return self.execute_task(
+                task,
+                with_evaluation=workflow.config.enable_evaluation,
+            )
+
+        # Continue until all tasks are processed or workflow is paused
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            while not workflow.is_complete():
+                # Check for pause
+                if workflow.status == WorkflowStatus.PAUSED:
+                    break
+
+                # Get tasks ready to execute
+                ready_tasks = workflow.get_ready_tasks()
+                if not ready_tasks:
+                    # No tasks ready but not complete - may have circular deps
+                    pending = workflow.get_pending_tasks()
+                    if pending:
+                        errors.append(
+                            "Workflow has unresolvable dependencies or no ready tasks"
+                        )
+                    break
+
+                # Submit ready tasks for parallel execution
+                futures = {
+                    executor.submit(execute_single_task, task): task
+                    for task in ready_tasks
+                }
+
+                # Process completed futures
+                for future in concurrent.futures.as_completed(futures):
+                    task = futures[future]
+                    try:
+                        result = future.result()
+                        with lock:
+                            if result.success:
+                                tasks_completed += 1
+                                outputs[str(task.id)] = result.output
+                            else:
+                                tasks_failed += 1
+                                if result.error:
+                                    errors.append(f"Task {task.name}: {result.error}")
+                            workflow.increment_iteration()
+                    except Exception as e:
+                        with lock:
+                            tasks_failed += 1
+                            errors.append(f"Task {task.name} raised exception: {e}")
+
+        return tasks_completed, tasks_failed, outputs, errors
 
     def create_standard_workflow(
         self,

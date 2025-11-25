@@ -158,6 +158,16 @@ class WorkflowResultResponse(BaseModel):
     outputs: dict[str, Any] = Field(default_factory=dict)
 
 
+class WorkflowActionResponse(BaseModel):
+    """Response for workflow actions (pause/resume)."""
+
+    workflow_id: UUID
+    action: str
+    success: bool
+    status: WorkflowStatus
+    message: str
+
+
 # ===== Template Models =====
 
 

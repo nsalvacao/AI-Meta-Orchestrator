@@ -110,6 +110,23 @@ class TestCLIAdapters:
         cmd = adapter._build_command("run --flag")
         assert cmd == ["/usr/bin/test-cli", "--verbose", "run", "--flag"]
 
+    def test_base_cli_adapter_build_command_with_args(self) -> None:
+        """Test BaseCLIAdapter builds command with args safely."""
+        config = CLIConfig(
+            executable="test-cli",
+            extra_args=["--verbose"],
+        )
+        adapter = BaseCLIAdapter(ExternalCLIType.CUSTOM, config)
+        adapter._executable_path = "/usr/bin/test-cli"
+
+        # Args should be added as separate list items (safe from shell injection)
+        cmd = adapter._build_command("suggest", args=["user input with spaces"])
+        assert cmd == ["/usr/bin/test-cli", "--verbose", "suggest", "user input with spaces"]
+
+        # Even input with shell metacharacters is safe
+        cmd = adapter._build_command("explain", args=["rm -rf /; echo 'pwned'"])
+        assert cmd == ["/usr/bin/test-cli", "--verbose", "explain", "rm -rf /; echo 'pwned'"]
+
     def test_gemini_adapter_api_key_envs(self) -> None:
         """Test Gemini adapter checks multiple API key environment variables."""
         adapter = GeminiCLIAdapter()

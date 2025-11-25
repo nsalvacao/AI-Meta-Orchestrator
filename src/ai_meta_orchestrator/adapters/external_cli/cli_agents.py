@@ -16,7 +16,10 @@ from ai_meta_orchestrator.adapters.external_cli.cli_adapters import (
 from ai_meta_orchestrator.domain.agents.agent_models import AgentConfig, AgentRole
 from ai_meta_orchestrator.domain.tasks.task_models import Task, TaskResult
 from ai_meta_orchestrator.ports.agent_ports.agent_port import AgentPort
-from ai_meta_orchestrator.ports.external_ports.external_port import ExternalCLIType
+from ai_meta_orchestrator.ports.external_ports.external_port import (
+    CLICommandResult,
+    ExternalCLIType,
+)
 
 
 class ExternalCLIAgent(AgentPort):
@@ -148,6 +151,32 @@ class ExternalCLIAgent(AgentPort):
             },
         )
 
+    def _create_task_result_from_cli(
+        self, cli_result: CLICommandResult, task: Task, cli_type: str
+    ) -> TaskResult:
+        """Create a TaskResult from a CLI command result.
+
+        Helper method to reduce code duplication in subclasses.
+
+        Args:
+            cli_result: The CLICommandResult from the adapter.
+            task: The task being executed.
+            cli_type: The CLI type string for metadata.
+
+        Returns:
+            TaskResult with the appropriate success/error state.
+        """
+        return TaskResult(
+            success=cli_result.success,
+            output=cli_result.output if cli_result.success else "",
+            error=cli_result.error if not cli_result.success else "",
+            metadata={
+                "task_id": str(task.id),
+                "cli_type": cli_type,
+                "exit_code": cli_result.exit_code,
+            },
+        )
+
     def can_handle(self, task: Task) -> bool:
         """Check if this agent can handle the given task.
 
@@ -225,16 +254,7 @@ class GeminiAgent(ExternalCLIAgent):
         else:
             result = adapter.execute(prompt)
 
-        return TaskResult(
-            success=result.success,
-            output=result.output if result.success else "",
-            error=result.error if not result.success else "",
-            metadata={
-                "task_id": str(task.id),
-                "cli_type": "gemini",
-                "exit_code": result.exit_code,
-            },
-        )
+        return self._create_task_result_from_cli(result, task, "gemini")
 
 
 class CodexAgent(ExternalCLIAgent):
@@ -302,16 +322,7 @@ class CodexAgent(ExternalCLIAgent):
         else:
             result = adapter.execute(prompt)
 
-        return TaskResult(
-            success=result.success,
-            output=result.output if result.success else "",
-            error=result.error if not result.success else "",
-            metadata={
-                "task_id": str(task.id),
-                "cli_type": "codex",
-                "exit_code": result.exit_code,
-            },
-        )
+        return self._create_task_result_from_cli(result, task, "codex")
 
 
 class CopilotAgent(ExternalCLIAgent):
@@ -379,16 +390,7 @@ class CopilotAgent(ExternalCLIAgent):
         else:
             result = adapter.execute(prompt)
 
-        return TaskResult(
-            success=result.success,
-            output=result.output if result.success else "",
-            error=result.error if not result.success else "",
-            metadata={
-                "task_id": str(task.id),
-                "cli_type": "copilot",
-                "exit_code": result.exit_code,
-            },
-        )
+        return self._create_task_result_from_cli(result, task, "copilot")
 
 
 def create_cli_agent(

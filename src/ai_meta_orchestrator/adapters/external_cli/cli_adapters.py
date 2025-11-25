@@ -112,12 +112,15 @@ class BaseCLIAdapter(ExternalCLIPort):
             return None
         return os.environ.get(self._config.api_key_env)
 
-    def _build_command(self, command: str, **kwargs: Any) -> list[str]:
+    def _build_command(
+        self, command: str, args: list[str] | None = None, **kwargs: Any
+    ) -> list[str]:
         """Build the full command with arguments.
 
         Args:
-            command: The command to execute.
-            **kwargs: Additional arguments.
+            command: The command to execute (e.g., "suggest", "explain").
+            args: Additional arguments to pass after the command.
+            **kwargs: Additional arguments (unused, for subclass compatibility).
 
         Returns:
             List of command arguments.
@@ -128,9 +131,13 @@ class BaseCLIAdapter(ExternalCLIPort):
         # Add extra args from config
         cmd.extend(self._config.extra_args)
 
-        # Add the main command
+        # Add the main command (split into parts)
         if command:
             cmd.extend(command.split())
+
+        # Add additional arguments safely (as separate list items)
+        if args:
+            cmd.extend(args)
 
         return cmd
 
@@ -143,11 +150,14 @@ class BaseCLIAdapter(ExternalCLIPort):
         env = os.environ.copy()
         return env
 
-    def execute(self, command: str, **kwargs: Any) -> CLICommandResult:
+    def execute(
+        self, command: str, args: list[str] | None = None, **kwargs: Any
+    ) -> CLICommandResult:
         """Execute a CLI command.
 
         Args:
             command: The command to execute.
+            args: Additional command arguments (passed safely without shell interpretation).
             **kwargs: Additional arguments:
                 - timeout: Override default timeout
                 - input_text: Text to pass to stdin
@@ -178,7 +188,7 @@ class BaseCLIAdapter(ExternalCLIPort):
         input_text = kwargs.get("input_text")
         working_dir = kwargs.get("working_dir", self._config.working_dir)
 
-        cmd = self._build_command(command, **kwargs)
+        cmd = self._build_command(command, args=args)
         env = self._get_env()
 
         try:
@@ -235,8 +245,14 @@ class GeminiCLIAdapter(BaseCLIAdapter):
         GOOGLE_API_KEY: API key for Gemini (or GEMINI_API_KEY)
 
     CLI Installation:
-        npm install -g @anthropic-ai/cli  # Example - actual package may differ
+        pip install google-generativeai  # Python SDK with CLI support
         # Or use Google Cloud SDK with Gemini support
+
+    Note:
+        The command format assumes a CLI interface compatible with:
+        `gemini generate --model <model> --prompt` (with prompt via stdin)
+        Actual CLI interfaces may vary. Override the generate() method
+        for custom CLI interfaces.
     """
 
     DEFAULT_EXECUTABLE = "gemini"
@@ -331,7 +347,12 @@ class CodexCLIAdapter(BaseCLIAdapter):
 
     CLI Installation:
         pip install openai  # OpenAI Python package includes CLI
-        # Or: npm install -g openai-cli
+
+    Note:
+        The command format assumes the OpenAI CLI interface:
+        `openai api completions.create -m <model> --max-tokens <n> -p` (with prompt via stdin)
+        `openai api chat.completions.create -m <model> --message` (with message via stdin)
+        Override methods for custom CLI interfaces.
     """
 
     DEFAULT_EXECUTABLE = "openai"
@@ -488,8 +509,8 @@ class CopilotCLIAdapter(BaseCLIAdapter):
         Returns:
             CLICommandResult with suggested commands.
         """
-        command = f"suggest \"{query}\""
-        return self.execute(command, **kwargs)
+        # Pass query as a separate argument to avoid command injection
+        return self.execute("suggest", args=[query], **kwargs)
 
     def explain(self, command_to_explain: str, **kwargs: Any) -> CLICommandResult:
         """Get explanation for a command.
@@ -501,8 +522,8 @@ class CopilotCLIAdapter(BaseCLIAdapter):
         Returns:
             CLICommandResult with explanation.
         """
-        command = f"explain \"{command_to_explain}\""
-        return self.execute(command, **kwargs)
+        # Pass command as a separate argument to avoid command injection
+        return self.execute("explain", args=[command_to_explain], **kwargs)
 
 
 class PlaceholderCLIAdapter(BaseCLIAdapter):

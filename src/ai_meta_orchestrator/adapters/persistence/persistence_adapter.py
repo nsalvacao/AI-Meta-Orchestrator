@@ -634,8 +634,17 @@ def create_persistence_adapter(
 
     Returns:
         A PersistencePort implementation.
+
+    Raises:
+        ValueError: If an unsupported backend is specified.
     """
     if backend == "sqlite":
         config = PersistenceConfig(**kwargs) if kwargs else None
         return SQLitePersistence(config)
-    return InMemoryPersistence()
+    elif backend == "memory":
+        return InMemoryPersistence()
+    else:
+        raise ValueError(
+            f"Unsupported persistence backend: '{backend}'. "
+            f"Supported backends: 'memory', 'sqlite'"
+        )

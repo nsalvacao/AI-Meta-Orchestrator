@@ -476,6 +476,8 @@ class OrchestratorService:
                             workflow.increment_iteration()
                     except Exception as e:
                         with lock:
+                            # Update task status on exception
+                            task.status = TaskStatus.FAILED
                             tasks_failed += 1
                             errors.append(f"Task {task.name} raised exception: {e}")
 

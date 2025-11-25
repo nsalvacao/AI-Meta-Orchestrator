@@ -267,3 +267,8 @@ class TestCreatePersistenceAdapter:
         """Test that default adapter is in-memory."""
         adapter = create_persistence_adapter()
         assert isinstance(adapter, InMemoryPersistence)
+
+    def test_unsupported_backend_raises(self) -> None:
+        """Test that unsupported backend raises ValueError."""
+        with pytest.raises(ValueError, match="Unsupported persistence backend"):
+            create_persistence_adapter("postgresql")

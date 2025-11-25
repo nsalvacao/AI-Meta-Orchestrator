@@ -16,6 +16,9 @@ CrewAI-based meta-orchestrator with internal agents (PM, Dev, QA, Security, Docs
 
 - **Task Distribution & Evaluation**: Intelligent task routing with built-in evaluation loops
 - **Correction Loops**: Automatic retry with feedback for failed tasks
+- **Workflow Templates**: Pre-built templates for common development scenarios
+- **Plugin System**: Extensible architecture for custom agents and tools
+- **REST API**: FastAPI-based REST API for integration
 - **Ports-and-Adapters Architecture**: Clean separation of concerns for easy extension
 - **Linux-First, Cross-OS Aware**: Optimized for Linux/WSL with cross-platform support
 
@@ -26,17 +29,24 @@ src/ai_meta_orchestrator/
 ├── domain/              # Core business logic
 │   ├── agents/          # Agent models and configurations
 │   ├── tasks/           # Task models and status management
-│   └── workflows/       # Workflow orchestration models
+│   ├── workflows/       # Workflow orchestration models
+│   ├── templates/       # Workflow template models
+│   └── plugins/         # Plugin system models
 ├── ports/               # Interface definitions (abstractions)
 │   ├── agent_ports/     # Agent operation interfaces
 │   ├── task_ports/      # Task execution interfaces
 │   └── external_ports/  # External system interfaces
 ├── adapters/            # Implementation of port interfaces
 │   ├── internal_agents/ # CrewAI agent implementations
-│   ├── external_cli/    # External CLI placeholders
-│   ├── credentials/     # Credential management placeholders
-│   ├── git_cicd/        # Git/CI-CD placeholders
-│   └── observability/   # Observability placeholders
+│   ├── external_cli/    # External CLI adapters
+│   ├── templates/       # Built-in workflow templates
+│   ├── credentials/     # Credential management
+│   ├── git_cicd/        # Git/CI-CD integration
+│   └── observability/   # Observability (logging, tracing)
+├── api/                 # REST API (FastAPI)
+│   ├── app.py           # Application setup
+│   ├── routes.py        # API endpoints
+│   └── models.py        # Request/Response models
 ├── application/         # Application layer (services, use cases)
 │   └── services/        # Orchestrator service
 └── infrastructure/      # Cross-cutting concerns
@@ -94,6 +104,42 @@ orchestrator run -d "Create a Python utility that counts word frequencies in a t
 
 # Run the demo workflow
 orchestrator demo
+
+# List available workflow templates
+orchestrator templates
+
+# Start the REST API server
+orchestrator serve --host 0.0.0.0 --port 8000
+```
+
+### REST API
+
+Start the API server:
+
+```bash
+orchestrator serve
+```
+
+Access the API at `http://localhost:8000`. API documentation is available at:
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+Example API calls:
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# List agents
+curl http://localhost:8000/agents
+
+# List templates
+curl http://localhost:8000/templates
+
+# Create workflow from template
+curl -X POST http://localhost:8000/templates/instantiate \
+  -H "Content-Type: application/json" \
+  -d '{"template_name": "Full Development Workflow", "params": {"project_name": "MyProject", "project_description": "A new project"}}'
 ```
 
 ### Programmatic Usage
@@ -157,6 +203,72 @@ qa_task = Task(
 workflow.add_task(qa_task)
 ```
 
+### Using Workflow Templates
+
+```python
+from ai_meta_orchestrator.adapters.templates import get_default_template_registry
+from ai_meta_orchestrator.application.services.orchestrator_service import OrchestratorService
+
+# Get the template registry
+registry = get_default_template_registry()
+
+# List available templates
+for template in registry.list_all():
+    print(f"{template.name} - {template.description}")
+
+# Instantiate a template
+template = registry.get("Full Development Workflow")
+workflow = template.instantiate({
+    "project_name": "MyProject",
+    "project_description": "Build a REST API",
+})
+
+# Run the workflow
+orchestrator = OrchestratorService()
+result = orchestrator.run_workflow(workflow)
+```
+
+### Using the Plugin System
+
+```python
+from ai_meta_orchestrator.domain.plugins import (
+    PluginRegistry,
+    HookPlugin,
+    HookPoint,
+    PluginMetadata,
+    PluginType,
+)
+
+# Create a custom hook plugin
+class MyLoggingPlugin(HookPlugin):
+    @property
+    def metadata(self):
+        return PluginMetadata(
+            name="my_logger",
+            version="1.0.0",
+            description="Logs workflow events",
+            plugin_type=PluginType.HOOK,
+        )
+    
+    @property
+    def hook_points(self):
+        return [HookPoint.BEFORE_TASK_EXECUTE, HookPoint.AFTER_TASK_EXECUTE]
+    
+    def initialize(self, config):
+        return True
+    
+    def shutdown(self):
+        pass
+    
+    def on_hook(self, hook_point, context):
+        print(f"Hook triggered: {hook_point.value}")
+        return context
+
+# Register the plugin
+registry = PluginRegistry()
+registry.register(MyLoggingPlugin())
+```
+
 ## Development
 
 ### Running Tests
@@ -187,24 +299,29 @@ mypy src
 
 ## Roadmap
 
-### Current (MVP)
+### Current (v0.2.0)
 
 - [x] Core agent architecture (PM, Dev, QA, Security, Docs)
 - [x] Task distribution and execution
 - [x] Evaluation and correction loops
 - [x] Ports-and-adapters architecture
 - [x] Platform detection (Linux-first, cross-OS aware)
+- [x] Workflow templates and presets
+- [x] Plugin system for custom agents
+- [x] REST API server (FastAPI)
+- [x] Enhanced observability (OpenTelemetry support)
+- [x] Secure credential management
+- [x] Git integration
 
-### Planned
+### Planned (v0.3.0+)
 
 - [ ] External CLI integrations (Gemini CLI, Codex CLI, Copilot Agent CLI)
-- [ ] Secure credential management
-- [ ] Git/CI-CD integration
-- [ ] Advanced observability (OpenTelemetry, metrics)
-- [ ] REST API server
 - [ ] Web dashboard
-- [ ] Plugin system for custom agents
-- [ ] Workflow templates and presets
+- [ ] Database persistence
+- [ ] Advanced workflow features (parallel, hierarchical)
+- [ ] Plugin marketplace
+
+See [BACKLOG.md](BACKLOG.md) for detailed task breakdown and implementation tracking.
 
 ## Project Structure
 
@@ -216,6 +333,7 @@ AI-Meta-Orchestrator/
 │   ├── unit/                    # Unit tests
 │   └── integration/             # Integration tests
 ├── pyproject.toml               # Project configuration
+├── BACKLOG.md                   # Evolutionary backlog
 ├── README.md                    # This file
 └── LICENSE                      # MIT License
 ```

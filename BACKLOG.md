@@ -230,7 +230,7 @@ with task breakdown and prioritization for implementation tracking.
 
 ## Version Milestones
 
-### v0.1.0 (Current - MVP) 🟢
+### v0.1.0 (MVP) 🟢
 - Core multi-agent orchestration
 - Basic task and workflow management
 - CLI interface

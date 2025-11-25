@@ -332,6 +332,8 @@ class OrchestratorService:
                     else Process.sequential
                 )
 
+                # Note: CrewAI's Crew expects list[BaseAgent], but Agent inherits from
+                # BaseAgent. The type: ignore is needed due to list invariance in mypy.
                 crew = Crew(
                     agents=crew_agents,  # type: ignore[arg-type]
                     tasks=crew_tasks,

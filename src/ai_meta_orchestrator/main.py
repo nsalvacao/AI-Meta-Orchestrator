@@ -107,6 +107,33 @@ def create_parser() -> argparse.ArgumentParser:
     # Demo command
     subparsers.add_parser("demo", help="Run a demo workflow")
 
+    # Server command
+    server_parser = subparsers.add_parser("serve", help="Start the REST API server")
+    server_parser.add_argument(
+        "--host",
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0)",
+    )
+    server_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Port to listen on (default: 8000)",
+    )
+    server_parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable auto-reload for development",
+    )
+
+    # Templates command
+    templates_parser = subparsers.add_parser("templates", help="List available workflow templates")
+    templates_parser.add_argument(
+        "-c",
+        "--category",
+        help="Filter by category",
+    )
+
     return parser
 
 
@@ -203,6 +230,75 @@ def cmd_demo(verbose: bool = False) -> int:
     )
 
 
+def cmd_serve(host: str, port: int, reload: bool = False) -> int:
+    """Handle the serve command to start the REST API server.
+
+    Args:
+        host: Host to bind to.
+        port: Port to listen on.
+        reload: Enable auto-reload for development.
+
+    Returns:
+        Exit code (0 for success, non-zero for failure).
+    """
+    print_banner()
+    print(f"Starting REST API server at http://{host}:{port}")
+    print(f"API Documentation: http://{host}:{port}/docs")
+    print()
+
+    try:
+        from ai_meta_orchestrator.api import run_server
+
+        run_server(host=host, port=port, reload=reload)
+        return 0
+    except ImportError:
+        print("Error: FastAPI and uvicorn are required for the API server.")
+        print("Install with: pip install ai-meta-orchestrator[api]")
+        return 1
+    except Exception as e:
+        print(f"Server error: {e}")
+        return 1
+
+
+def cmd_templates(category: str | None = None) -> None:
+    """Handle the templates command.
+
+    Args:
+        category: Optional category to filter by.
+    """
+    from ai_meta_orchestrator.adapters.templates import get_default_template_registry
+    from ai_meta_orchestrator.domain.templates.template_models import TemplateCategory
+
+    print_banner()
+    print("Available Workflow Templates")
+    print("=" * 60)
+    print()
+
+    registry = get_default_template_registry()
+
+    if category:
+        try:
+            cat = TemplateCategory(category.lower())
+            templates = registry.get_by_category(cat)
+        except ValueError:
+            print(f"Unknown category: {category}")
+            print(f"Available categories: {[c.value for c in TemplateCategory]}")
+            return
+    else:
+        templates = registry.list_all()
+
+    for template in templates:
+        print(f"📋 {template.name} (v{template.version})")
+        print(f"   Category: {template.category.value}")
+        print(f"   Description: {template.description}")
+        print(f"   Required params: {', '.join(template.required_params)}")
+        if template.optional_params:
+            print(f"   Optional params: {', '.join(template.optional_params.keys())}")
+        if template.tags:
+            print(f"   Tags: {', '.join(template.tags)}")
+        print()
+
+
 def main() -> int:
     """Main entry point.
 
@@ -225,6 +321,15 @@ def main() -> int:
         )
     elif args.command == "demo":
         return cmd_demo(verbose=args.verbose)
+    elif args.command == "serve":
+        return cmd_serve(
+            host=args.host,
+            port=args.port,
+            reload=args.reload,
+        )
+    elif args.command == "templates":
+        cmd_templates(category=args.category if hasattr(args, "category") else None)
+        return 0
     else:
         parser.print_help()
         return 1

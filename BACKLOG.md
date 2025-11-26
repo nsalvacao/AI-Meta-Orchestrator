@@ -139,11 +139,11 @@ with task breakdown and prioritization for implementation tracking.
 - [ ] Add task management UI
 - [ ] Implement template browser
 
-### 3.3 Advanced Workflow Features 🔴
-- [ ] Implement parallel task execution
-- [ ] Add hierarchical workflow support
+### 3.3 Advanced Workflow Features 🟡
+- [x] Implement parallel task execution
+- [x] Add hierarchical workflow support
 - [ ] Create workflow chaining
-- [ ] Implement workflow pause/resume
+- [x] Implement workflow pause/resume
 - [ ] Add workflow versioning
 - [ ] Create workflow import/export
 
@@ -163,9 +163,9 @@ with task breakdown and prioritization for implementation tracking.
   - [ ] HashiCorp Vault
 - [ ] Add audit logging
 
-### 3.6 Performance & Scalability 🔴
+### 3.6 Performance & Scalability 🟡
 - [ ] Implement workflow caching
-- [ ] Add database persistence
+- [x] Add database persistence
 - [ ] Create async task execution
 - [ ] Implement distributed workflow execution
 - [ ] Add rate limiting
@@ -236,7 +236,7 @@ with task breakdown and prioritization for implementation tracking.
 - CLI interface
 - Placeholder adapters
 
-### v0.2.0 (Current) 🟢
+### v0.2.0 🟢
 - Workflow templates system ✅
 - Plugin architecture ✅
 - REST API server ✅
@@ -245,10 +245,13 @@ with task breakdown and prioritization for implementation tracking.
 - Git integration ✅
 - External CLI integrations ✅
 
-### v0.3.0 (Next) 🟡
-- Web dashboard MVP
-- Database persistence
-- Advanced workflow features
+### v0.3.0 (Current) 🟡
+- Database persistence ✅ (SQLite-based)
+- Advanced workflow features:
+  - Parallel task execution ✅
+  - Workflow pause/resume ✅
+  - Hierarchical workflow support ✅
+- Web dashboard MVP (pending)
 
 ### v0.4.0 (Planned) 🔴
 - Plugin marketplace
@@ -273,8 +276,9 @@ with task breakdown and prioritization for implementation tracking.
 | Credential Management | Done | High |
 | Git Integration | Done | High |
 | External CLI Integrations | Done | High |
+| Database Persistence | Done | High |
+| Advanced Workflows | Partial | Medium |
 | Web Dashboard | Large | Medium |
-| Advanced Workflows | Medium | Medium |
 | Plugin Marketplace | Large | Low |
 | Enterprise Features | Extra Large | Low |
 

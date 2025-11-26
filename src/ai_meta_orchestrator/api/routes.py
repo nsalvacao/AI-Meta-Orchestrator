@@ -25,6 +25,7 @@ from ai_meta_orchestrator.api.models import (
     TemplateInstantiateRequest,
     TemplateInstantiateResponse,
     TemplateListResponse,
+    WorkflowActionResponse,
     WorkflowCreate,
     WorkflowListResponse,
     WorkflowResponse,
@@ -400,6 +401,87 @@ def run_standard_workflow(request: StandardWorkflowRequest) -> WorkflowResultRes
 
     _workflow_results[workflow.id] = result_response
     return result_response
+
+
+@workflows_router.post(
+    "/{workflow_id}/pause",
+    response_model=WorkflowActionResponse,
+    summary="Pause workflow",
+    description="Pause a running workflow.",
+    responses={404: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
+)
+def pause_workflow(workflow_id: UUID) -> WorkflowActionResponse:
+    """Pause a running workflow."""
+    workflow = _workflows.get(workflow_id)
+    if workflow is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workflow '{workflow_id}' not found",
+        )
+
+    if workflow.pause():
+        return WorkflowActionResponse(
+            workflow_id=workflow.id,
+            action="pause",
+            success=True,
+            status=workflow.status,
+            message="Workflow paused successfully",
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot pause workflow in state '{workflow.status.value}'",
+        )
+
+
+@workflows_router.post(
+    "/{workflow_id}/resume",
+    response_model=WorkflowActionResponse,
+    summary="Resume workflow",
+    description="Resume a paused workflow.",
+    responses={404: {"model": ErrorResponse}, 400: {"model": ErrorResponse}},
+)
+def resume_workflow(workflow_id: UUID) -> WorkflowActionResponse:
+    """Resume a paused workflow."""
+    workflow = _workflows.get(workflow_id)
+    if workflow is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workflow '{workflow_id}' not found",
+        )
+
+    if workflow.resume():
+        return WorkflowActionResponse(
+            workflow_id=workflow.id,
+            action="resume",
+            success=True,
+            status=workflow.status,
+            message="Workflow resumed successfully",
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot resume workflow in state '{workflow.status.value}'",
+        )
+
+
+@workflows_router.delete(
+    "/{workflow_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete workflow",
+    description="Delete a workflow and its results.",
+    responses={404: {"model": ErrorResponse}},
+)
+def delete_workflow(workflow_id: UUID) -> None:
+    """Delete a workflow."""
+    if workflow_id not in _workflows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workflow '{workflow_id}' not found",
+        )
+
+    del _workflows[workflow_id]
+    _workflow_results.pop(workflow_id, None)
 
 
 # ===== Templates Router =====

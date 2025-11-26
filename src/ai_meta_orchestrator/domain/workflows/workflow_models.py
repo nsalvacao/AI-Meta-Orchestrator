@@ -118,6 +118,32 @@ class Workflow:
         """Get all pending tasks."""
         return [t for t in self.tasks if t.status == TaskStatus.PENDING]
 
+    def get_ready_tasks(self) -> list[Task]:
+        """Get tasks ready for execution (dependencies completed).
+
+        Returns tasks that are pending and have all their context_tasks completed.
+        This is useful for parallel execution modes.
+
+        Returns:
+            List of tasks ready to be executed.
+        """
+        completed_task_ids = {
+            t.id for t in self.tasks
+            if t.status in (TaskStatus.COMPLETED, TaskStatus.FAILED)
+        }
+
+        ready = []
+        for task in self.tasks:
+            if task.status != TaskStatus.PENDING:
+                continue
+
+            # Check if all dependencies are completed
+            deps_met = all(dep_id in completed_task_ids for dep_id in task.context_tasks)
+            if deps_met:
+                ready.append(task)
+
+        return ready
+
     def get_tasks_needing_revision(self) -> list[Task]:
         """Get all tasks that need revision."""
         return [t for t in self.tasks if t.status == TaskStatus.NEEDS_REVISION]
@@ -126,6 +152,28 @@ class Workflow:
         """Start the workflow execution."""
         self.status = WorkflowStatus.RUNNING
         self.started_at = datetime.now()
+
+    def pause(self) -> bool:
+        """Pause the workflow execution.
+
+        Returns:
+            True if workflow was paused, False if not in a pausable state.
+        """
+        if self.status == WorkflowStatus.RUNNING:
+            self.status = WorkflowStatus.PAUSED
+            return True
+        return False
+
+    def resume(self) -> bool:
+        """Resume a paused workflow.
+
+        Returns:
+            True if workflow was resumed, False if not paused.
+        """
+        if self.status == WorkflowStatus.PAUSED:
+            self.status = WorkflowStatus.RUNNING
+            return True
+        return False
 
     def complete(self, result: WorkflowResult) -> None:
         """Mark the workflow as completed."""

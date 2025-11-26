@@ -236,3 +236,96 @@ class TestWorkflow:
         completed, total = workflow.get_progress()
         assert completed == 2
         assert total == 3
+
+    def test_pause_workflow(self) -> None:
+        """Test pausing a running workflow."""
+        workflow = Workflow(name="Test", description="Test")
+        workflow.start()
+
+        assert workflow.pause() is True
+        assert workflow.status == WorkflowStatus.PAUSED
+
+    def test_pause_workflow_not_running(self) -> None:
+        """Test pausing a workflow that is not running."""
+        workflow = Workflow(name="Test", description="Test")
+        # Workflow is NOT_STARTED
+        assert workflow.pause() is False
+        assert workflow.status == WorkflowStatus.NOT_STARTED
+
+    def test_resume_workflow(self) -> None:
+        """Test resuming a paused workflow."""
+        workflow = Workflow(name="Test", description="Test")
+        workflow.start()
+        workflow.pause()
+
+        assert workflow.resume() is True
+        assert workflow.status == WorkflowStatus.RUNNING
+
+    def test_resume_workflow_not_paused(self) -> None:
+        """Test resuming a workflow that is not paused."""
+        workflow = Workflow(name="Test", description="Test")
+        workflow.start()
+        # Workflow is RUNNING, not PAUSED
+        assert workflow.resume() is False
+        assert workflow.status == WorkflowStatus.RUNNING
+
+    def test_get_ready_tasks_no_dependencies(self) -> None:
+        """Test getting ready tasks when tasks have no dependencies."""
+        workflow = Workflow(name="Test", description="Test")
+        task1 = Task(name="Task 1", description="First", assigned_to=AgentRole.DEV)
+        task2 = Task(name="Task 2", description="Second", assigned_to=AgentRole.QA)
+
+        workflow.add_task(task1)
+        workflow.add_task(task2)
+
+        ready = workflow.get_ready_tasks()
+        assert len(ready) == 2
+
+    def test_get_ready_tasks_with_dependencies(self) -> None:
+        """Test getting ready tasks with dependencies."""
+        workflow = Workflow(name="Test", description="Test")
+        task1 = Task(name="Task 1", description="First", assigned_to=AgentRole.DEV)
+        task2 = Task(
+            name="Task 2",
+            description="Second",
+            assigned_to=AgentRole.QA,
+            context_tasks=[task1.id],  # Depends on task1
+        )
+        task3 = Task(
+            name="Task 3",
+            description="Third",
+            assigned_to=AgentRole.DOCS,
+            context_tasks=[task2.id],  # Depends on task2
+        )
+
+        workflow.add_task(task1)
+        workflow.add_task(task2)
+        workflow.add_task(task3)
+
+        # Initially only task1 is ready
+        ready = workflow.get_ready_tasks()
+        assert len(ready) == 1
+        assert ready[0] == task1
+
+        # Complete task1
+        task1.status = TaskStatus.COMPLETED
+        ready = workflow.get_ready_tasks()
+        assert len(ready) == 1
+        assert ready[0] == task2
+
+        # Complete task2
+        task2.status = TaskStatus.COMPLETED
+        ready = workflow.get_ready_tasks()
+        assert len(ready) == 1
+        assert ready[0] == task3
+
+    def test_get_ready_tasks_all_completed(self) -> None:
+        """Test getting ready tasks when all are completed."""
+        workflow = Workflow(name="Test", description="Test")
+        task1 = Task(name="Task 1", description="First", assigned_to=AgentRole.DEV)
+        task1.status = TaskStatus.COMPLETED
+
+        workflow.add_task(task1)
+
+        ready = workflow.get_ready_tasks()
+        assert len(ready) == 0

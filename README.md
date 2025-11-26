@@ -351,7 +351,7 @@ mypy src
 
 ## Roadmap
 
-### Current (v0.2.0)
+### Previous (v0.2.0)
 
 - [x] Core agent architecture (PM, Dev, QA, Security, Docs)
 - [x] Task distribution and execution
@@ -366,12 +366,19 @@ mypy src
 - [x] Git integration
 - [x] External CLI integrations (Gemini CLI, Codex CLI, Copilot Agent CLI)
 
-### Planned (v0.3.0+)
+### Current (v0.3.0)
 
-- [ ] Web dashboard
-- [ ] Database persistence
-- [ ] Advanced workflow features (parallel, hierarchical)
+- [x] Database persistence (SQLite)
+- [x] Parallel task execution
+- [x] Workflow pause/resume
+- [x] Hierarchical workflow support
+- [ ] Web dashboard (pending)
+
+### Planned (v0.4.0+)
+
 - [ ] Plugin marketplace
+- [ ] Advanced security features
+- [ ] Performance optimizations
 
 See [BACKLOG.md](BACKLOG.md) for detailed task breakdown and implementation tracking.
 

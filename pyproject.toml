@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-meta-orchestrator"
-version = "0.2.0"
+version = "0.3.0"
 description = "CrewAI-based meta-orchestrator with internal agents (PM, Dev, QA, Security, Docs) and sequential workflow with evaluation and task return loops"
 readme = "README.md"
 license = {text = "MIT"}
